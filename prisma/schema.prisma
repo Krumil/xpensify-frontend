@@ -1,0 +1,92 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["expense_schema"]
+}
+
+model GroupMembers {
+  id           BigInt         @id @default(autoincrement())
+  userId       BigInt?
+  groupId      BigInt?
+  joinedAt     DateTime?      @db.Timestamp(6)
+  isAdmin      Boolean?
+  balance      Float?
+  Groups       Groups?        @relation(fields: [groupId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Users        Users?         @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  Transactions Transactions[]
+
+  @@schema("expense_schema")
+}
+
+model Groups {
+  id           BigInt         @id @default(autoincrement())
+  tgId         String         @unique @db.VarChar
+  name         String         @db.VarChar
+  description  String?        @db.VarChar
+  currency     String         @db.VarChar
+  createdAt    DateTime?      @db.Timestamp(6)
+  updatedAt    DateTime?      @db.Timestamp(6)
+  GroupMembers GroupMembers[]
+
+  @@schema("expense_schema")
+}
+
+model Settlements {
+  id                                  BigInt    @id @default(autoincrement())
+  payerId                             String?   @db.VarChar
+  receiverId                          String?   @db.VarChar
+  amount                              Float?
+  status                              String?   @db.VarChar
+  createdAt                           DateTime? @db.Timestamp(6)
+  updatedAt                           DateTime? @db.Timestamp(6)
+  Users_Settlements_payerIdToUsers    Users?    @relation("Settlements_payerIdToUsers", fields: [payerId], references: [tgId], onDelete: NoAction, onUpdate: NoAction)
+  Users_Settlements_receiverIdToUsers Users?    @relation("Settlements_receiverIdToUsers", fields: [receiverId], references: [tgId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("expense_schema")
+}
+
+model Transactions {
+  id            BigInt        @id @default(autoincrement())
+  groupMemberId BigInt?
+  description   String?       @db.VarChar
+  amount        Float?
+  date          DateTime?     @db.Timestamp(6)
+  createdAt     DateTime?     @db.Timestamp(6)
+  updatedAt     DateTime?     @db.Timestamp(6)
+  GroupMembers  GroupMembers? @relation(fields: [groupMemberId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("expense_schema")
+}
+
+model Users {
+  id                                        BigInt         @id @default(autoincrement())
+  tgId                                      String         @unique @db.VarChar
+  username                                  String?        @db.VarChar
+  firstName                                 String?        @db.VarChar
+  lastName                                  String?        @db.VarChar
+  createdAt                                 DateTime?      @db.Timestamp(6)
+  updatedAt                                 DateTime?      @db.Timestamp(6)
+  GroupMembers                              GroupMembers[]
+  Settlements_Settlements_payerIdToUsers    Settlements[]  @relation("Settlements_payerIdToUsers")
+  Settlements_Settlements_receiverIdToUsers Settlements[]  @relation("Settlements_receiverIdToUsers")
+  Wallets                                   Wallets?
+
+  @@schema("expense_schema")
+}
+
+model Wallets {
+  id        String    @id @db.VarChar
+  userId    BigInt?   @unique
+  walletId  String?   @unique @db.VarChar
+  seed      String?   @db.VarChar
+  createdAt DateTime? @db.Timestamp(6)
+  updatedAt DateTime? @db.Timestamp(6)
+  Users     Users?    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@schema("expense_schema")
+}

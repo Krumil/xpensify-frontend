@@ -8,18 +8,18 @@ import 'normalize.css/normalize.css';
 import './_assets/globals.css';
 
 export const metadata: Metadata = {
-  title: 'Your Application Title Goes Here',
-  description: 'Your application description goes here',
+	title: 'Expense Tracker',
+	description: 'Expense Tracker',
 };
 
 export default function RootLayout({ children }: PropsWithChildren) {
-  return (
-    <html lang="en">
-    <body>
-      <Root>
-        {children}
-      </Root>
-    </body>
-    </html>
-  );
+	return (
+		<html lang="en">
+			<body>
+				<Root>
+					{children}
+				</Root>
+			</body>
+		</html>
+	);
 }
