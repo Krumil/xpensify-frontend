@@ -1,0 +1,27 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"type": "node",
+			"request": "launch",
+			"name": "Debug Next.js HTTPS",
+			"runtimeExecutable": "pnpm",
+			"runtimeArgs": [
+				"run",
+				"dev:https"
+			],
+			"env": {
+				"NODE_OPTIONS": "--inspect"
+			},
+			"console": "integratedTerminal",
+			"internalConsoleOptions": "neverOpen",
+			"resolveSourceMapLocations": [
+				"${workspaceFolder}/**",
+				"!**/node_modules/**"
+			],
+			"skipFiles": [
+				"<node_internals>/**"
+			]
+		}
+	]
+}

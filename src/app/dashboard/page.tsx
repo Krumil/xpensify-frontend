@@ -1,61 +1,80 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useInitData, useHapticFeedback } from '@telegram-apps/sdk-react';
-import { Users, RefreshCcw, ChevronRight, Search, Loader2 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
-import { useGroupStore } from '@/lib/store';
+import React, { useState, useEffect, useCallback } from 'react'
+import { useInitData, useHapticFeedback } from '@telegram-apps/sdk-react'
+import { Users, RefreshCcw, ChevronRight, Search, Loader2, Wallet, Plus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useGroupStore } from '@/lib/store'
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 
 interface Group {
-	id: number;
-	title: string;
-	type: string;
-	memberCount: number;
-	lastActive: string;
+	id: number
+	title: string
+	type: string
+	memberCount: number
+	lastActive: string
 }
 
-const Dashboard = () => {
-	const [groups, setGroups] = useState<Group[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState('');
-	const [refreshing, setRefreshing] = useState(false);
-	const [searchTerm, setSearchTerm] = useState('');
-	const [processingGroup, setProcessingGroup] = useState<number | null>(null);
+interface WalletInfo {
+	balances: {
+		[key: string]: number
+	},
+	id: string,
+	walletId: string
+}
 
-	const router = useRouter();
-	const initData = useInitData();
-	const haptic = useHapticFeedback();
+export default function Dashboard() {
+	const [groups, setGroups] = useState<Group[]>([])
+	const [walletInfo, setWalletInfo] = useState<WalletInfo | null>(null)
+	const [loading, setLoading] = useState(true)
+	const [error, setError] = useState('')
+	const [refreshing, setRefreshing] = useState(false)
+	const [searchTerm, setSearchTerm] = useState('')
+	const [processingGroup, setProcessingGroup] = useState<number | null>(null)
 
-	const fetchGroups = useCallback(async () => {
-		setRefreshing(true);
+	const router = useRouter()
+	const initData = useInitData()
+	const haptic = useHapticFeedback()
+
+	const fetchData = useCallback(async () => {
+		setRefreshing(true)
 		try {
 			if (!initData?.user?.id) {
-				throw new Error('User ID not found');
+				throw new Error('User ID not found')
 			}
 
-			const response = await fetch(`/api/groups?tgId=${initData.user.id}`);
-			if (!response.ok) {
-				throw new Error('Failed to fetch groups');
+			const [groupsResponse, walletResponse] = await Promise.all([
+				fetch(`/api/groups?tgId=${initData.user.id}`),
+				fetch(`/api/wallet?tgId=${initData.user.id}`)
+			])
+
+			if (!groupsResponse.ok || !walletResponse.ok) {
+				throw new Error('Failed to fetch data')
 			}
 
-			const data = await response.json();
-			setGroups(data.groups);
+			const groupsData = await groupsResponse.json()
+			const walletData = await walletResponse.json()
+
+			setGroups(groupsData.groups)
+			setWalletInfo(walletData.user.wallet)
 		} catch (err) {
-			setError('Failed to fetch groups. Please try again.');
-			console.error(err);
+			setError('Failed to fetch data. Please try again.')
+			console.error(err)
 		} finally {
-			setLoading(false);
-			setRefreshing(false);
+			setLoading(false)
+			setRefreshing(false)
 		}
-	}, [initData]);
+	}, [initData])
 
 	useEffect(() => {
-		fetchGroups();
-	}, [fetchGroups]);
+		fetchData()
+	}, [fetchData])
 
 	const processMessages = async (groupId: number) => {
-		setProcessingGroup(groupId);
-		haptic.impactOccurred('light');
+		setProcessingGroup(groupId)
+		haptic.impactOccurred('light')
 		try {
 			const response = await fetch('/api/groups', {
 				method: 'POST',
@@ -63,102 +82,131 @@ const Dashboard = () => {
 					'Content-Type': 'application/json',
 				},
 				body: JSON.stringify(groupId),
-			});
+			})
 
 			if (!response.ok) {
-				throw new Error('Failed to process messages');
+				throw new Error('Failed to process messages')
 			}
 
-			const data = await response.json();
-			useGroupStore.getState().setGroupData(data);
-			router.push(`/group-details?id=${groupId}`);
+			const data = await response.json()
+			console.log(data)
+			data.group.currency = data.group.currency === 'USD' ? '$' : data.group.currency === 'EUR' ? '€' : data.group.currency
+			useGroupStore.getState().setGroupData(data)
+			router.push(`/group-details?id=${groupId}`)
 		} catch (err) {
-			setError('Failed to process messages. Please try again.');
-			console.error(err);
+			setError('Failed to process messages. Please try again.')
+			console.error(err)
 		} finally {
-			setProcessingGroup(null);
+			setProcessingGroup(null)
 		}
-	};
+	}
 
 	const filteredGroups = groups.filter(group =>
 		group.title.toLowerCase().includes(searchTerm.toLowerCase())
-	);
+	)
 
 	if (loading) {
 		return (
-			<div className="flex items-center justify-center h-screen bg-[#0E1621]">
+			<div className="flex items-center justify-center h-screen bg-[#17212B]">
 				<div className="animate-pulse flex flex-col items-center">
 					<div className="w-20 h-20 bg-[#2B5278] rounded-full mb-4"></div>
 					<div className="h-4 bg-[#2B5278] rounded w-32"></div>
 				</div>
 			</div>
-		);
+		)
 	}
 
+	console.log(walletInfo)
+
 	return (
-		<div className="flex flex-col h-screen bg-[#0E1621] text-[#F5F5F5]">
-			<header className="bg-[#17212B] p-4 sticky top-0 z-10 shadow-md">
-				<div className="flex justify-between items-center mb-4">
-					<h1 className="text-2xl font-bold text-[#5EBBF0]">Your Groups</h1>
-					<button
-						onClick={() => {
-							haptic.impactOccurred('medium');
-							fetchGroups();
-						}}
-						className={`p-2 rounded-full bg-[#2B5278] hover:bg-[#3A6D9A] focus:outline-none focus:ring-2 focus:ring-[#5EBBF0] transition-all duration-300 ease-in-out transform ${refreshing ? 'rotate-180' : ''}`}
-					>
-						<RefreshCcw className={`h-6 w-6 ${refreshing ? 'animate-spin' : ''}`} />
-					</button>
-				</div>
-				<div className="relative">
-					<input
-						type="text"
-						placeholder="Search groups..."
-						value={searchTerm}
-						onChange={(e) => setSearchTerm(e.target.value)}
-						className="w-full bg-[#242F3D] text-[#F5F5F5] rounded-full py-2 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-[#5EBBF0]"
-					/>
-					<Search className="absolute left-3 top-2.5 h-5 w-5 text-[#8E99A4]" />
-				</div>
-			</header>
-			<main className="flex-grow overflow-y-auto p-4">
+		<div className="flex flex-col h-screen bg-[#17212B] text-[#F5F5F5]">
+			<main className="flex-grow overflow-y-auto p-4 space-y-4">
 				{error && (
 					<div className="bg-[#E53935] bg-opacity-20 border border-[#E53935] text-[#E53935] px-4 py-3 rounded mb-4 animate-pulse">
 						<p>{error}</p>
 					</div>
 				)}
-				<ul className="space-y-3">
-					{filteredGroups.map((group, index) => (
-						<li
-							key={group.id}
-							className="bg-[#17212B] rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:translate-x-2"
-							style={{ animationDelay: `${index * 50}ms` }}
-						>
-							<button
-								className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-[#5EBBF0] rounded-lg transition-colors duration-300 flex items-center justify-between"
-								onClick={() => processMessages(group.id)}
-								disabled={processingGroup === group.id}
-							>
-								<div className="flex items-center flex-1">
-									<div className="flex-shrink-0 bg-[#2B5278] rounded-full p-2">
-										<Users className="h-8 w-8 text-[#F5F5F5]" aria-hidden="true" />
+				<Card className="bg-gradient-to-br from-[#2B5278] to-[#242F3D] border-none shadow-lg">
+					<CardHeader className="pb-2">
+						<CardTitle className="text-[#F5F5F5] flex items-center text-xl">
+							<Wallet className="mr-2 h-6 w-6" />
+							Your Wallet
+						</CardTitle>
+					</CardHeader>
+					<CardContent>
+						<div className="space-y-4">
+							<div>
+								<p className="text-sm text-[#A8B8C7] mb-1">Balances</p>
+								{walletInfo ? (
+									<div className="grid grid-cols-2 gap-2">
+										{Object.entries(walletInfo.balances).map(([currency, amount]) => (
+											<div key={currency} className="bg-[#17212B] rounded-lg p-3">
+												<p className="text-xs text-[#A8B8C7]">{currency.toUpperCase()}</p>
+												<p className="text-lg font-bold text-[#F5F5F5]">{amount}</p>
+											</div>
+										))}
 									</div>
-									<div className="ml-4 flex-1">
-										<p className="text-lg font-medium text-[#F5F5F5]">{group.title}</p>
-									</div>
-								</div>
-								{processingGroup === group.id ? (
-									<Loader2 className="h-6 w-6 text-[#8E99A4] ml-2 animate-spin" />
 								) : (
-									<ChevronRight className="h-6 w-6 text-[#8E99A4] ml-2" />
+									<p className="text-[#F5F5F5] italic">No balance information available</p>
 								)}
-							</button>
-						</li>
-					))}
-				</ul>
+							</div>
+							<Button
+								onClick={() => {
+									haptic.impactOccurred('light')
+									// Add logic to handle adding funds
+								}}
+								className="w-full bg-[#5288C1] hover:bg-[#4A7EB0] text-white transition-colors duration-300"
+							>
+								<Plus className="mr-2 h-4 w-4" /> Add Funds
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+
+				<div>
+					<h2 className="text-xl font-bold text-[#5288C1] mb-2">Your Groups</h2>
+					<div className="relative mb-4">
+						<Search className="absolute left-3 top-2.5 h-5 w-5 text-[#8E99A4]" />
+						<Input
+							type="text"
+							placeholder="Search groups..."
+							value={searchTerm}
+							onChange={(e) => setSearchTerm(e.target.value)}
+							className="w-full bg-[#242F3D] text-[#F5F5F5] rounded-full py-2 px-4 pl-10 focus:outline-none focus:ring-2 focus:ring-[#5288C1] border-none"
+						/>
+					</div>
+					<ul className="space-y-3">
+						{filteredGroups.map((group, index) => (
+							<li
+								key={group.id}
+								className="bg-[#242F3D] rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:translate-x-2"
+								style={{ animationDelay: `${index * 50}ms` }}
+							>
+								<button
+									className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-[#5288C1] rounded-lg transition-colors duration-300 flex items-center justify-between"
+									onClick={() => processMessages(group.id)}
+									disabled={processingGroup === group.id}
+								>
+									<div className="flex items-center flex-1">
+										<div className="flex-shrink-0 bg-[#2B5278] rounded-full p-2">
+											<Users className="h-6 w-6 text-[#F5F5F5]" aria-hidden="true" />
+										</div>
+										<div className="ml-4 flex-1">
+											<p className="text-lg font-medium text-[#F5F5F5]">{group.title}</p>
+											<p className="text-sm text-[#A8B8C7]">{group.memberCount} members</p>
+										</div>
+									</div>
+									{processingGroup === group.id ? (
+										<Loader2 className="h-6 w-6 text-[#8E99A4] ml-2 animate-spin" />
+									) : (
+										<ChevronRight className="h-6 w-6 text-[#8E99A4] ml-2" />
+									)}
+								</button>
+							</li>
+						))}
+					</ul>
+				</div>
 			</main>
 		</div>
-	);
-};
-
-export default Dashboard;
+	)
+}

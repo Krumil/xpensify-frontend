@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Address, Coinbase } from "@coinbase/coinbase-sdk";
+import { Wallet, Coinbase } from "@coinbase/coinbase-sdk";
 import { PrismaClient } from '@prisma/client';
 import { encrypt, decrypt } from '@/lib/utils';
 
@@ -14,15 +14,18 @@ if (process.env.NODE_ENV === 'production') {
 	prisma = (global as any).prisma;
 }
 
-export async function POST(request: NextRequest) {
-	const { COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY } = process.env;
+const { COINBASE_KEY_NAME, COINBASE_PRIVATE_KEY } = process.env;
 
-	if (!COINBASE_KEY_NAME || !COINBASE_PRIVATE_KEY) {
-		return NextResponse.json(
-			{ message: "Environment variables are not set" },
-			{ status: 500 }
-		);
-	}
+if (!COINBASE_KEY_NAME || !COINBASE_PRIVATE_KEY) {
+	throw new Error("COINBASE_KEY_NAME and COINBASE_PRIVATE_KEY must be set");
+}
+
+const coinbase = new Coinbase({
+	apiKeyName: COINBASE_KEY_NAME as string,
+	privateKey: COINBASE_PRIVATE_KEY.replaceAll("\\n", "\n") as string,
+});
+
+export async function POST(request: NextRequest) {
 
 	const body = await request.json();
 
@@ -30,12 +33,6 @@ export async function POST(request: NextRequest) {
 		return NextResponse.json({ message: "Telegram ID is required" }, { status: 400 });
 	}
 
-	const coinbase = new Coinbase({
-		apiKeyName: COINBASE_KEY_NAME,
-		privateKey: COINBASE_PRIVATE_KEY,
-	});
-
-	const user = await coinbase.getDefaultUser();
 
 	let userWallet;
 	let walletData;
@@ -47,9 +44,9 @@ export async function POST(request: NextRequest) {
 	});
 
 	if (!dbUser) {
-		// Create wallet first
+		// Create or import wallet
 		try {
-			userWallet = await user.createWallet({ networkId: Coinbase.networks.BaseSepolia });
+			userWallet = await Wallet.create();
 			walletData = userWallet.export();
 			const encryptedData = encrypt(JSON.stringify(walletData));
 			const address = userWallet.getDefaultAddress()?.getId() || '';
@@ -72,16 +69,14 @@ export async function POST(request: NextRequest) {
 			});
 
 			// Request faucet funds for new wallet
-			try {
-				const faucetTransaction = await userWallet.faucet();
-				console.log(`Faucet transaction: ${faucetTransaction}`);
-			} catch (e) {
-				console.log("Faucet is not available or failed:", e);
-			}
+			let faucetTransaction = await userWallet.faucet();
+			console.log(`ETH Faucet transaction: ${faucetTransaction}`);
+			faucetTransaction = await userWallet.faucet(Coinbase.assets.Usdc);
+			console.log(`USDC Faucet transaction: ${faucetTransaction}`);
 		} catch (e) {
-			console.error("Failed to create new wallet:", e);
+			console.error("Failed to create/import new wallet:", e);
 			return NextResponse.json(
-				{ message: "Failed to create new wallet" },
+				{ message: "Failed to create/import new wallet" },
 				{ status: 500 }
 			);
 		}
@@ -91,11 +86,10 @@ export async function POST(request: NextRequest) {
 			if (!decryptedData.walletId) {
 				throw new Error("Wallet ID is missing from the stored data");
 			}
-			userWallet = await user.importWallet(decryptedData);
-
-			if (!userWallet.canSign()) {
-				userWallet.setSeed(decryptedData.seed);
-			}
+			userWallet = await Wallet.import({
+				seed: decryptedData.seed,
+				walletId: decryptedData.walletId
+			});
 
 			await userWallet.listAddresses();
 		} catch (e) {
@@ -141,6 +135,22 @@ export async function GET(request: NextRequest) {
 			return NextResponse.json({ message: "User not found" }, { status: 404 });
 		}
 
+		if (!dbUser.Wallets) {
+			return NextResponse.json({ message: "User has no wallet" }, { status: 404 });
+		}
+
+		const decryptedData = JSON.parse(decrypt(dbUser.Wallets.seed || ''));
+		const userWallet = await Wallet.import({
+			seed: decryptedData.seed,
+			walletId: decryptedData.walletId
+		});
+
+		let balances = await userWallet.listBalances();
+		let formattedBalances = Object.fromEntries(
+			Array.from(balances).map(([key, value]) => [key, value.toNumber()])
+		);
+
+
 		return NextResponse.json({
 			user: {
 				tgId: dbUser.tgId,
@@ -149,6 +159,7 @@ export async function GET(request: NextRequest) {
 				wallet: dbUser.Wallets ? {
 					id: dbUser.Wallets.id,
 					walletId: dbUser.Wallets.walletId,
+					balances: formattedBalances,
 				} : null,
 			}
 		}, { status: 200 });
