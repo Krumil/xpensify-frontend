@@ -3,14 +3,15 @@
 import React from 'react'
 import { useRouter } from 'next/navigation'
 import { useInitData, useHapticFeedback } from '@telegram-apps/sdk-react'
-import { ArrowLeft, ArrowRight, Wallet, CheckCircle } from 'lucide-react'
+import { Wallet, CheckCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner'
 
 export default function OnboardingPage() {
-	const [step, setStep] = React.useState(0)
+	const [step, setStep] = React.useState(-1) // Start with -1 to indicate loading
 	const [walletId, setWalletId] = React.useState('')
 	const [walletAddress, setWalletAddress] = React.useState('')
 	const [loading, setLoading] = React.useState(true)
@@ -20,15 +21,29 @@ export default function OnboardingPage() {
 	const initData = useInitData()
 	const haptic = useHapticFeedback()
 
+	// TEST Replace initData.user.id with your own Telegram ID for testing
+	if (!process.env.NEXT_PUBLIC_TEST_USER_ID) {
+		console.log("NEXT_PUBLIC_TEST_USER_ID is not set. Please set it in the .env file.");
+	}
+
+	const testUser = {
+		id: process.env.NEXT_PUBLIC_TEST_USER_ID || '',
+		username: 'testuser',
+		firstName: 'Test',
+		lastName: 'User'
+	}
+	const user = testUser
+	// const user = initData?.user
+
 	React.useEffect(() => {
 		const checkUserExists = async () => {
 			if (initData?.user?.id) {
 				try {
-					const response = await fetch(`/api/wallet?tgId=${initData.user.id}`)
+					const response = await fetch(`/api/wallet?tgId=${user.id}`)
 					if (response.ok) {
 						router.push('/dashboard')
 					} else if (response.status === 404) {
-						setStep(0)
+						setStep(0) // Set to first step only if user doesn't exist
 					} else {
 						throw new Error('Failed to check user')
 					}
@@ -59,10 +74,10 @@ export default function OnboardingPage() {
 					'Content-Type': 'application/json',
 				},
 				body: JSON.stringify({
-					tgId: initData.user.id.toString(),
-					username: initData.user.username,
-					firstName: initData.user.firstName,
-					lastName: initData.user.lastName
+					tgId: user.id.toString(),
+					username: user.username,
+					firstName: user.firstName,
+					lastName: user.lastName
 				}),
 			})
 
@@ -132,7 +147,7 @@ export default function OnboardingPage() {
 										{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}
 									</span>
 								</p>
-								<a href={`https://sepolia.basescan.org/address/${walletAddress}`} target="_blank" rel="noopener noreferrer" className="ml-2">
+								<a href={`https://sepolia.basescan.org/address/${walletAddress.toLowerCase()}`} target="_blank" rel="noopener noreferrer" className="ml-2">
 									<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#A8B8C7] hover:text-[#5288C1]">
 										<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
 										<polyline points="15 3 21 3 21 9"></polyline>
@@ -150,13 +165,14 @@ export default function OnboardingPage() {
 		},
 	]
 
-	if (!initData || loading) {
+	if (!initData || loading || step === -1) {
 		return (
 			<div className="flex items-center justify-center min-h-screen bg-[#17212B]">
-				<div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#5288C1]"></div>
+				<LoadingSpinner size="large" />
 			</div>
 		)
 	}
+
 
 	return (
 		<div className="min-h-screen bg-[#17212B] text-white flex flex-col">

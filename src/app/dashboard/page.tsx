@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { useInitData, useHapticFeedback } from '@telegram-apps/sdk-react'
-import { Users, RefreshCcw, ChevronRight, Search, Loader2, Wallet, Plus } from 'lucide-react'
+import { Users, ChevronRight, Search, Loader2, Wallet, Plus, ExternalLink } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useGroupStore } from '@/lib/store'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import LoadingSpinner from '@/components/LoadingSpinner/LoadingSpinner'
 
 interface Group {
 	id: number
@@ -45,9 +46,14 @@ export default function Dashboard() {
 				throw new Error('User ID not found')
 			}
 
+			// TEST Replace initData.user.id with your own Telegram ID for testing
+			const testUserId = process.env.NEXT_PUBLIC_TEST_USER_ID
+			const userId = testUserId
+			// const userId = initData?.user?.id
+
 			const [groupsResponse, walletResponse] = await Promise.all([
-				fetch(`/api/groups?tgId=${initData.user.id}`),
-				fetch(`/api/wallet?tgId=${initData.user.id}`)
+				fetch(`/api/groups?tgId=${userId}`),
+				fetch(`/api/wallet?tgId=${userId}`)
 			])
 
 			if (!groupsResponse.ok || !walletResponse.ok) {
@@ -89,9 +95,10 @@ export default function Dashboard() {
 			}
 
 			const data = await response.json()
-			console.log(data)
 			data.group.currency = data.group.currency === 'USD' ? '$' : data.group.currency === 'EUR' ? '€' : data.group.currency
 			useGroupStore.getState().setGroupData(data)
+			// save data to local storage
+			localStorage.setItem('groupData', JSON.stringify(data))
 			router.push(`/group-details?id=${groupId}`)
 		} catch (err) {
 			setError('Failed to process messages. Please try again.')
@@ -108,15 +115,10 @@ export default function Dashboard() {
 	if (loading) {
 		return (
 			<div className="flex items-center justify-center h-screen bg-[#17212B]">
-				<div className="animate-pulse flex flex-col items-center">
-					<div className="w-20 h-20 bg-[#2B5278] rounded-full mb-4"></div>
-					<div className="h-4 bg-[#2B5278] rounded w-32"></div>
-				</div>
+				<LoadingSpinner size="large" />
 			</div>
 		)
 	}
-
-	console.log(walletInfo)
 
 	return (
 		<div className="flex flex-col h-screen bg-[#17212B] text-[#F5F5F5]">
@@ -129,8 +131,13 @@ export default function Dashboard() {
 				<Card className="bg-gradient-to-br from-[#2B5278] to-[#242F3D] border-none shadow-lg">
 					<CardHeader className="pb-2">
 						<CardTitle className="text-[#F5F5F5] flex items-center text-xl">
-							<Wallet className="mr-2 h-6 w-6" />
-							Your Wallet
+							<div className="flex items-center">
+								<Wallet className="mr-2 h-6 w-6" />
+								<span className="mr-2">Your Wallet</span>
+								<a href={`https://sepolia.basescan.org/address/${walletInfo?.id.toLowerCase()}`} target="_blank" rel="noopener noreferrer">
+									<ExternalLink className="h-4 w-4 text-[#A8B8C7] hover:text-[#F5F5F5] transition-colors duration-300" />
+								</a>
+							</div>
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
@@ -153,7 +160,7 @@ export default function Dashboard() {
 							<Button
 								onClick={() => {
 									haptic.impactOccurred('light')
-									// Add logic to handle adding funds
+									window.open('https://faucet.circle.com/', '_blank')
 								}}
 								className="w-full bg-[#5288C1] hover:bg-[#4A7EB0] text-white transition-colors duration-300"
 							>
@@ -179,11 +186,11 @@ export default function Dashboard() {
 						{filteredGroups.map((group, index) => (
 							<li
 								key={group.id}
-								className="bg-[#242F3D] rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:translate-x-2"
+								className="bg-[#242F3D] rounded-lg shadow-lg transition-all duration-300 ease-in-out transform hover:bg-[#2B5278] border-2 border-transparent hover:border-[#5288C1]"
 								style={{ animationDelay: `${index * 50}ms` }}
 							>
 								<button
-									className="w-full text-left p-4 focus:outline-none focus:ring-2 focus:ring-[#5288C1] rounded-lg transition-colors duration-300 flex items-center justify-between"
+									className="w-full text-left p-2 focus:outline-none focus:ring-2 focus:ring-[#5288C1] rounded-lg transition-colors duration-300 flex items-center justify-between"
 									onClick={() => processMessages(group.id)}
 									disabled={processingGroup === group.id}
 								>
@@ -193,7 +200,8 @@ export default function Dashboard() {
 										</div>
 										<div className="ml-4 flex-1">
 											<p className="text-lg font-medium text-[#F5F5F5]">{group.title}</p>
-											<p className="text-sm text-[#A8B8C7]">{group.memberCount} members</p>
+											{/* <p className="text-sm text-[#A8B8C7]">{group.memberCount} members</p> */}
+											<p className="text-sm text-[#A8B8C7]">4 members</p>
 										</div>
 									</div>
 									{processingGroup === group.id ? (

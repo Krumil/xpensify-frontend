@@ -54,7 +54,6 @@ export async function POST(request: Request) {
 			throw new Error(data.detail || "Failed to process messages");
 		}
 
-		console.log('data:', data);
 		return NextResponse.json(data);
 	} catch (error) {
 		console.error(error);

@@ -27,6 +27,7 @@
 		"next": "14.2.4",
 		"normalize.css": "^8.0.1",
 		"react": "^18",
+		"react-confetti": "^6.1.0",
 		"react-dom": "^18",
 		"tailwind-merge": "^2.5.2",
 		"tailwindcss-animate": "^1.0.7",
