@@ -78,7 +78,8 @@ For more detailed deployment instructions, refer to the [Telegram Mini Apps docu
 
 Check out our video demo to see Xpensify in action:
 
-[Watch the Demo Video](./Xpensify.mp4)
+
+https://github.com/user-attachments/assets/b0abdfe5-367a-418a-a725-a4b5ee520851
 
 ## Contributing
 
