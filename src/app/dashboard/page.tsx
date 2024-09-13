@@ -39,7 +39,7 @@ export default function Dashboard() {
 	const initData = useInitData()
 	const haptic = useHapticFeedback()
 
-	const fetchData = useCallback(async () => {
+	const fetchData = async () => {
 		setRefreshing(true)
 		try {
 			if (!initData?.user?.id) {
@@ -72,11 +72,11 @@ export default function Dashboard() {
 			setLoading(false)
 			setRefreshing(false)
 		}
-	}, [initData])
+	}
 
 	useEffect(() => {
 		fetchData()
-	}, [fetchData])
+	}, [])
 
 	const processMessages = async (groupId: number) => {
 		setProcessingGroup(groupId)
@@ -98,7 +98,6 @@ export default function Dashboard() {
 			data.group.currency = data.group.currency === 'USD' ? '$' : data.group.currency === 'EUR' ? '€' : data.group.currency
 			useGroupStore.getState().setGroupData(data)
 			// save data to local storage
-			localStorage.setItem('groupData', JSON.stringify(data))
 			router.push(`/group-details?id=${groupId}`)
 		} catch (err) {
 			setError('Failed to process messages. Please try again.')

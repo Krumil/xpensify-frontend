@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
 		});
 
 		const results = [];
+		const completedSettlementIds = [];
 
 		const apiUrl = process.env.API_URL;
 		if (!apiUrl) {
@@ -67,31 +68,13 @@ export async function POST(request: NextRequest) {
 				await transfer.wait();
 
 				if (transfer.getStatus() === 'complete') {
-					const completeResponse = await fetch(`${apiUrl}/complete-settlements`, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-						},
-						body: JSON.stringify({
-							settlementIds: [settlement.id]
-						}),
+					completedSettlementIds.push(settlement.id);
+					results.push({
+						status: 'success',
+						message: "Payment settled successfully",
+						transferId: transfer.getId(),
+						settlementId: settlement.id
 					});
-
-					if (completeResponse.ok) {
-						results.push({
-							status: 'success',
-							message: "Payment settled and completed successfully",
-							transferId: transfer.getId(),
-							settlementId: settlement.id
-						});
-					} else {
-						results.push({
-							status: 'partial',
-							message: "Payment settled but not marked as completed",
-							transferId: transfer.getId(),
-							settlementId: settlement.id
-						});
-					}
 				} else {
 					results.push({ status: 'error', message: "Transfer failed", settlementId: settlement.id });
 				}
@@ -101,6 +84,30 @@ export async function POST(request: NextRequest) {
 				} else {
 					throw err;
 				}
+			}
+		}
+
+		// Make a single API call for all completed settlements
+		if (completedSettlementIds.length > 0) {
+			const completeResponse = await fetch(`${apiUrl}/complete-settlements`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					settlementIds: completedSettlementIds
+				}),
+			});
+
+			if (!completeResponse.ok) {
+				console.error('Failed to mark settlements as completed');
+				// Update results for settlements that weren't marked as completed
+				results.forEach(result => {
+					if (result.status === 'success') {
+						result.status = 'partial';
+						result.message = "Payment settled but not marked as completed";
+					}
+				});
 			}
 		}
 

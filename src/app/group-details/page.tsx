@@ -64,14 +64,15 @@ const GroupDetails = () => {
 			// 	throw new Error(mockResponse.message || 'Settlement failed');
 			// }
 
-			// Assuming groupData.settlements is an array of settlement objects
+			const userSettlements = groupData.settlements.filter(s => s.fromUserId === currentUserId);
+
 			const response = await fetch('/api/payments', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 				},
 				body: JSON.stringify({
-					settlements: groupData?.settlements || [],
+					settlements: userSettlements,
 					currentUserId: currentUserId
 				}),
 			});
@@ -83,23 +84,36 @@ const GroupDetails = () => {
 			const result = await response.json();
 			console.log(`Settlements result:`, result);
 
-			// Update the settlements array to remove settled transactions
-			const updatedSettlements = result.updatedSettlements;
-			useGroupStore.getState().setGroupData({
-				...groupData,
-				settlements: updatedSettlements
-			});
+			// Check if all settlements were successful
+			const allSettled = result.results.every((r: { status: string }) => r.status === 'success');
 
-			mainButton.setText('Settled');
+			if (allSettled) {
+				setIsSettled(true);
+				setShowSettledMessage(true);
+				setTimeout(() => setShowSettledMessage(false), 4000);
+				mainButton.setText('Settled');
+
+				// Update the settlements array to remove settled transactions
+				const updatedSettlements = groupData.settlements.filter(
+					s => !result.results.some((r: { settlementId: string }) => r.settlementId === s.id)
+				);
+				useGroupStore.getState().setGroupData({
+					...groupData,
+					settlements: updatedSettlements
+				});
+			} else {
+				// Some settlements failed
+				const failedSettlements = result.results.filter((r: { status: string }) => r.status === 'error');
+				console.error('Some settlements failed:', failedSettlements);
+				mainButton.setText('Partial Settlement');
+			}
 		} catch (error) {
 			console.error('Error settling expenses:', error);
 			mainButton.setText('Settlement Failed');
 		} finally {
 			mainButton.hideLoader();
 			mainButton.enable();
-			setTimeout(() => {
-				setIsSettling(false);
-			}, 1000);
+			setIsSettling(false);
 		}
 	};
 
@@ -119,7 +133,7 @@ const GroupDetails = () => {
 		return () => {
 			mainButton.hide();
 		};
-	}, [mainButton, groupData, isSettled]);
+	}, [mainButton, isSettled]);
 
 	useEffect(() => {
 		backButton.show();
@@ -127,12 +141,6 @@ const GroupDetails = () => {
 	}, [backButton, router]);
 
 	if (!groupData) {
-		setTimeout(() => {
-			const groupData = localStorage.getItem('groupData')
-			if (groupData) {
-				useGroupStore.getState().setGroupData(JSON.parse(groupData))
-			}
-		}, 1000)
 		return (
 			<div className="flex items-center justify-center h-screen bg-[#17212B]">
 				<LoadingSpinner size="large" />
