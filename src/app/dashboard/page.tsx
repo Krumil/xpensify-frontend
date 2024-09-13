@@ -40,6 +40,7 @@ export default function Dashboard() {
 	const haptic = useHapticFeedback()
 
 	const fetchData = async () => {
+		console.log('test')
 		setRefreshing(true)
 		try {
 			if (!initData?.user?.id) {

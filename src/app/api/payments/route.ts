@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
 			// Create a gasless USDC transfer
 			const transfer = await userWallet.createTransfer({
-				amount: settlement.amount / 10000,
+				amount: settlement.amount / 100,
 				assetId: Coinbase.assets.Usdc,
 				destination: recipient.Wallets.id,
 				gasless: true
